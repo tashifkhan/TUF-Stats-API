@@ -1,0 +1,2 @@
+PLATFORM = "tuf"
+CATEGORY = "dsa"
