@@ -1,8 +1,9 @@
 import json
 import re
 
-from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+import httpx
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse, Response
 
 router = APIRouter(tags=["Documentation"])
 docs_router = router
@@ -16,6 +17,7 @@ SAMPLE = TRY_PATH.strip("/").split("/")[0]
 PLATFORM_KEY = 'tuf'
 REPO = 'tashifkhan/TUF-Stats-API'
 CODETRACE_URL = 'https://codetrace.tashif.codes'
+POSTHOG_PROXY_HOST = 'https://eu.i.posthog.com'
 CANONICAL_ENDPOINTS = [
     ('GET', '/{username}', 'Summary'),
     ('GET', '/{username}/profile', 'Profile'),
@@ -26,6 +28,13 @@ CANONICAL_ENDPOINTS = [
     ('GET', '/{username}/badges', 'Empty badges'),
 ]
 LEGACY_ENDPOINTS = []
+
+_POSTHOG_SCRIPT = """
+<script>
+!function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;void 0!==a?u=e[a]=[]:a="posthog";u.people=u.people||[];u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e};u.people.toString=function(){return u.toString(1)+".people (stub)"};o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys getNextSurveyStep onSessionId".split(" ");for(n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+posthog.init('phc_xxpoU7jHjt4nKAb4ygdiNwheukaBi7QvoAT4AsrdBcZC',{api_host:'/ph',ui_host:'https://eu.posthog.com',defaults:'2026-05-30'});
+</script>
+"""
 
 # ── Shared Command-Code-style design system (identical across every platform) ──
 
@@ -890,8 +899,31 @@ def _docs_html(title_suffix: str = "Stats API") -> str:
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>'
         f"<style>:root{{--accent:{ACCENT};}}</style>"
         f"<style>{_BASE_CSS}</style></head><body>"
-        f"{body}<script>{_JS}</script></body></html>"
+        f"{body}<script>{_JS}</script>{_POSTHOG_SCRIPT}</body></html>"
     )
+
+
+@router.api_route("/ph/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], include_in_schema=False)
+async def posthog_proxy(path: str, request: Request) -> Response:
+    headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() not in {"host", "content-length"}
+    }
+    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        upstream = await client.request(
+            request.method,
+            f"{POSTHOG_PROXY_HOST}/{path}",
+            params=request.query_params,
+            content=await request.body(),
+            headers=headers,
+        )
+    response_headers = {
+        key: value
+        for key, value in upstream.headers.items()
+        if key.lower() not in {"connection", "content-encoding", "transfer-encoding"}
+    }
+    return Response(content=upstream.content, status_code=upstream.status_code, headers=response_headers)
 
 
 @router.get("/", response_class=HTMLResponse, include_in_schema=False)
