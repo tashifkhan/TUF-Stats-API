@@ -1,5 +1,6 @@
 import json
 import re
+from urllib.parse import quote
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
@@ -60,6 +61,7 @@ a{color:inherit;text-decoration:none}
 .topnav a.icon{display:grid;place-items:center;width:32px;height:32px;padding:0;color:var(--muted);border:1px solid var(--line);border-radius:var(--r)}
 .topnav a.icon:hover{color:var(--ink);background:var(--panel-2);border-color:var(--line-2)}
 .topnav a.icon svg{width:16px;height:16px}
+.topnav a.ct-link{display:inline-flex;align-items:center;gap:6px}.topnav a.ct-link svg{width:13px;height:13px;flex:none}
 
 .wrap{display:grid;grid-template-columns:262px minmax(0,1fr) 224px;max-width:1480px;margin:0 auto}
 aside.side{position:sticky;top:54px;align-self:start;height:calc(100vh - 54px);overflow:auto;padding:22px 14px 48px;border-right:1px solid var(--line)}
@@ -301,6 +303,15 @@ document.querySelectorAll('.section').forEach(function(s){io.observe(s)});
 var si=document.querySelector('.search input');
 if(si)si.addEventListener('input',function(){var q=si.value.toLowerCase();
   document.querySelectorAll('.navgroup a').forEach(function(a){a.style.display=a.textContent.toLowerCase().indexOf(q)>-1?'':'none'});
+});
+function playgroundPath(){
+  var base = window.location.pathname.replace(new RegExp('/(docs|redoc)/?$'), '').replace(new RegExp('/$'), '');
+  return (base || '') + '/playground';
+}
+document.querySelectorAll('a[href="/playground"]').forEach(function(a){
+  var href = playgroundPath();
+  a.setAttribute('href', href);
+  a.addEventListener('click', function(e){ e.preventDefault(); window.location.assign(href); });
 });
 """
 
@@ -691,25 +702,61 @@ def _playground_rows(endpoints: list[tuple[str, str, str]]) -> str:
     return "".join(out)
 
 
+_ACCENT_INK = "#050506"
+
+# takeUforward brand badge — dark disc, italic "TUF" wordmark, orange chevron.
+_TUF_BADGE = (
+    '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"'
+    ' style="width:24px;height:24px">'
+    '<rect width="24" height="24" rx="6" fill="#0a0a0c"/>'
+    '<text x="10.4" y="15.7" font-family="Arial, Helvetica, sans-serif" font-size="8.6"'
+    ' font-weight="900" font-style="italic" letter-spacing="-0.6" text-anchor="middle"'
+    ' fill="#fafafa">TUF</text>'
+    '<path d="M17.3 10.9 19.7 13 17.3 15.1" fill="none" stroke="#ff7a3d" stroke-width="1.5"'
+    ' stroke-linecap="round" stroke-linejoin="round"/></svg>'
+)
+# Browser-tab favicon — the same badge on a full disc.
+_FAVICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    '<circle cx="32" cy="32" r="32" fill="#0a0a0c"/>'
+    '<text x="27" y="41" font-family="Arial, Helvetica, sans-serif" font-size="23"'
+    ' font-weight="900" font-style="italic" letter-spacing="-1.5" text-anchor="middle"'
+    ' fill="#fafafa">TUF</text>'
+    '<path d="M45 27 53 34 45 41" fill="none" stroke="#ff7a3d" stroke-width="5"'
+    ' stroke-linecap="round" stroke-linejoin="round"/></svg>'
+)
+_FAVICON_LINK = (
+    '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,'
+    + quote(_FAVICON_SVG) + '"/>'
+)
+
+# Prompt ">_" mark for the CodeTrace cross-link, echoing the CodeTrace favicon.
+_CODETRACE_GLYPH = (
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"'
+    ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M6 8l4 4-4 4"/><path d="M13.5 16h4.5"/></svg>'
+)
+
+
 def _topbar(logo_svg: str, show_menu_btn: bool = True) -> str:
     menu_btn = '<button class="menu-btn" aria-label="Toggle navigation">&#9776;</button>' if show_menu_btn else ""
     return f"""
 <header class="topbar">
   {menu_btn}
-  <a class="brand" href="/"><span class="glyph">{logo_svg}</span>{PLATFORM}<span class="sub">/ API</span></a>
+  <a class="brand" href="/"><span class="glyph" style="background:#0a0a0c;padding:0">{logo_svg}</span>{PLATFORM}<span class="sub">/ API</span></a>
   <nav class="topnav">
     <a href="/">Home</a>
     <a href="/docs">OpenAPI</a>
     <a href="/redoc">ReDoc</a>
     <a class="icon" href="https://github.com/{REPO}" target="_blank" rel="noreferrer" title="View source on GitHub" aria-label="GitHub repository">{_GITHUB_ICON}</a>
-    <a href="{CODETRACE_URL}" target="_blank" rel="noreferrer" title="Browse every platform on CodeTrace">CodeTrace&nbsp;&#8599;</a>
+    <a class="ct-link" href="{CODETRACE_URL}" target="_blank" rel="noreferrer" title="Browse every platform on CodeTrace">{_CODETRACE_GLYPH}CodeTrace&nbsp;&#8599;</a>
     <a class="cta" href="/playground">Try it</a>
   </nav>
 </header>"""
 
 
 def _playground_html() -> str:
-    logo_svg = "T"  # takeUforward has no wordmark glyph; the brand style renders a bold letter
+    logo_svg = _TUF_BADGE
     canonical_rows = _playground_rows(CANONICAL_ENDPOINTS)
     legacy_section = ""
     if LEGACY_ENDPOINTS:
@@ -754,6 +801,7 @@ def _playground_html() -> str:
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8"/>'
         '<meta name="viewport" content="width=device-width, initial-scale=1"/>'
+        + _FAVICON_LINK +
         f"<title>{PLATFORM} Playground</title>"
         '<link rel="preconnect" href="https://fonts.googleapis.com"/>'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>'
@@ -768,7 +816,7 @@ def _playground_html() -> str:
 
 def _docs_html(title_suffix: str = "Stats API") -> str:
     param = "{" + PARAM + "}"
-    logo_svg = "T"  # takeUforward has no wordmark glyph; the brand style renders a bold letter
+    logo_svg = _TUF_BADGE
     canonical = _endpoint_rows(CANONICAL_ENDPOINTS)
     legacy = (
         f'<div class="eps">{_endpoint_rows(LEGACY_ENDPOINTS, is_legacy=True)}</div>'
@@ -884,6 +932,7 @@ def _docs_html(title_suffix: str = "Stats API") -> str:
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8"/>'
         '<meta name="viewport" content="width=device-width, initial-scale=1"/>'
+        + _FAVICON_LINK +
         f"<title>{PLATFORM} {title_suffix}</title>"
         '<link rel="preconnect" href="https://fonts.googleapis.com"/>'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>'
