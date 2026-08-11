@@ -8,7 +8,6 @@ from routes.docs import router as docs_router
 from routes.heatmap import router as heatmap_router
 from routes.profile import router as profile_router
 from routes.rating import router as rating_router
-from routes.raw import router as raw_router
 from routes.stats import router as stats_router
 from routes.summary import router as summary_router
 
@@ -29,7 +28,6 @@ app.add_middleware(
 app.add_middleware(CacheRateLimitMiddleware, platform="tuf")
 
 app.include_router(docs_router)
-app.include_router(raw_router)
 app.include_router(profile_router)
 app.include_router(stats_router)
 app.include_router(contests_router)

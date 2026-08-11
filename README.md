@@ -29,15 +29,6 @@ GET /{username}/heatmap?view=last_365
 GET /{username}/heatmap?view=year&year=2026
 ```
 
-## Raw Upstream Helpers
-
-```http
-GET /raw/{username}/profile
-GET /raw/{username}/dsa-progress
-GET /raw/{username}/subjects
-GET /raw/{username}/heatmap?year=2026
-```
-
 The public takeUforward frontend currently uses `https://backend-go.takeuforward.org/api/v1/progress/dsa/{username}` for DSA totals. The older shared-profile URL returns 404 for public username lookup.
 
 The TUF heatmap upstream currently rejects years before 2023, so canonical heatmaps fetch history from 2023 through the current year by default. Override with `TUF_FIRST_HEATMAP_YEAR` if that changes.
