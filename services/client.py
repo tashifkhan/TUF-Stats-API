@@ -1,4 +1,7 @@
 import os
+import json
+from core.runtime import http_client, remaining
+from core.source import source
 from typing import Any, Dict, Optional
 
 import httpx
@@ -33,15 +36,15 @@ def _message(payload: Any, fallback: str) -> str:
     return fallback
 
 
-async def fetch_json(path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def _fetch_json(path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     url = f"{BASE_URL}/{path.lstrip('/')}"
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT, headers=HEADERS) as client:
-            response = await client.get(url, params=params)
+        async with http_client() as client:
+            response = await client.get(url, params=params, headers=HEADERS, timeout=min(4, remaining()))
     except httpx.TimeoutException as exc:
         raise HTTPException(status_code=504, detail="TUF upstream request timed out") from exc
     except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail=f"TUF upstream request failed: {exc}") from exc
+        raise HTTPException(status_code=502, detail="TUF upstream request failed") from exc
 
     try:
         payload = response.json() if response.content else {}
@@ -54,6 +57,10 @@ async def fetch_json(path: str, params: Optional[Dict[str, Any]] = None) -> Dict
     if not isinstance(payload, dict):
         raise HTTPException(status_code=502, detail="TUF upstream returned invalid JSON")
     return payload
+
+
+async def fetch_json(path, params=None):
+    return await source('tuf:'+path+json.dumps(params, sort_keys=True), lambda: _fetch_json(path, params))
 
 
 async def fetch_profile(username: str) -> Dict[str, Any]:

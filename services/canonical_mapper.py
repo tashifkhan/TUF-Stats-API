@@ -1,6 +1,6 @@
 import asyncio
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from math import ceil
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -179,14 +179,24 @@ def heatmap_from_year_payloads(year_payloads: Dict[int, Dict[str, Any]]) -> Heat
 
 def _years_for_heatmap(view: str, year: Optional[int]) -> Iterable[int]:
     today = datetime.now(timezone.utc).date()
-    high = max(today.year, year or today.year)
-    return range(FIRST_HEATMAP_YEAR, high + 1)
+    if view == "year" and year is not None:
+        return [year]
+    if view == "last_365":
+        return range((today - timedelta(days=364)).year, today.year + 1)
+    return range(FIRST_HEATMAP_YEAR, today.year + 1)
 
 
 async def build_heatmap(username: str, view: str = "all", year: Optional[int] = None) -> Heatmap:
     years = sorted(set(_years_for_heatmap(view, year)))
     payloads = await asyncio.gather(*(fetch_heatmap_year(username, y) for y in years))
-    return heatmap_from_year_payloads(dict(zip(years, payloads)))
+    heatmap = heatmap_from_year_payloads(dict(zip(years, payloads)))
+    if view != "all":
+        # A narrowed fetch must not shrink the years clients can still ask for.
+        observed = [item.year for item in heatmap.yearlyContributions]
+        floor = min([*observed, FIRST_HEATMAP_YEAR])
+        ceiling = max([datetime.now(timezone.utc).year, *years])
+        heatmap.availableYears = list(range(ceiling, floor - 1, -1))
+    return heatmap
 
 
 def summary_from(card: Card) -> Summary:
@@ -202,12 +212,13 @@ def summary_from(card: Card) -> Summary:
 
 
 async def build_card(username: str) -> Card:
-    progress_payload, profile_payload, subjects_payload = await asyncio.gather(
+    progress_payload, profile_payload, subjects_payload, raw_heatmap = await asyncio.gather(
         fetch_dsa_progress(username),
         fetch_profile(username),
         fetch_subjects_progress(username),
+        build_heatmap(username),
     )
-    heatmap = window_heatmap(await build_heatmap(username), "all", None)
+    heatmap = window_heatmap(raw_heatmap, "all", None)
     return Card(
         username=username,
         profile=profile_from(profile_payload, username),

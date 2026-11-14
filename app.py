@@ -1,3 +1,4 @@
+from core.runtime import RequestBudgetMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(CacheRateLimitMiddleware, platform="tuf")
+app.add_middleware(RequestBudgetMiddleware)
 
 app.include_router(docs_router)
 app.include_router(profile_router)
