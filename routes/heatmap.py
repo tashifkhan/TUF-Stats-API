@@ -16,4 +16,7 @@ async def get_heatmap(
 ):
     normalized_view, normalized_year = normalize_view(view, year)
     heatmap = await canonical_mapper.build_heatmap(username, normalized_view, normalized_year)
-    return make_envelope(username, window_heatmap(heatmap, normalized_view, normalized_year))
+    return make_envelope(
+        username,
+        window_heatmap(heatmap, normalized_view, normalized_year, available_years=heatmap.availableYears or None),
+    )
