@@ -19,6 +19,9 @@ app = FastAPI(
     description="FastAPI service for public takeUforward DSA progress statistics.",
 )
 
+app.add_middleware(CacheRateLimitMiddleware, platform="tuf")
+app.add_middleware(RequestBudgetMiddleware)
+# Added last so it is outermost: budget 504s and 429s still carry CORS headers.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,8 +29,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(CacheRateLimitMiddleware, platform="tuf")
-app.add_middleware(RequestBudgetMiddleware)
 
 app.include_router(docs_router)
 app.include_router(profile_router)
