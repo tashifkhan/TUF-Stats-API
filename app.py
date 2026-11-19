@@ -2,6 +2,7 @@ from core.runtime import RequestBudgetMiddleware
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.analytics import AnalyticsMiddleware
 from core.middleware import CacheRateLimitMiddleware
 from routes.badges import router as badges_router
 from routes.contests import router as contests_router
@@ -21,6 +22,8 @@ app = FastAPI(
 
 app.add_middleware(CacheRateLimitMiddleware, platform="tuf")
 app.add_middleware(RequestBudgetMiddleware)
+# Outside the cache so cache hits and 429s are counted; inside CORS.
+app.add_middleware(AnalyticsMiddleware, api="tuf")
 # Added last so it is outermost: budget 504s and 429s still carry CORS headers.
 app.add_middleware(
     CORSMiddleware,
