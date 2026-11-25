@@ -23,7 +23,7 @@ app = FastAPI(
 app.add_middleware(CacheRateLimitMiddleware, platform="tuf")
 app.add_middleware(RequestBudgetMiddleware)
 # Outside the cache so cache hits and 429s are counted; inside CORS.
-app.add_middleware(AnalyticsMiddleware, api="tuf")
+app.add_middleware(AnalyticsMiddleware, api="tuf", wait=True)
 # Added last so it is outermost: budget 504s and 429s still carry CORS headers.
 app.add_middleware(
     CORSMiddleware,
