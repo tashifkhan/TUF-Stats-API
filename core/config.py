@@ -6,6 +6,8 @@ def _int_env(name: str, fallback: str) -> int:
 
 
 class CacheRateLimitSettings:
+    oracle_redis_url = os.getenv("ORACLE_REDIS_URL")
+    oracle_redis_ca_cert = os.getenv("ORACLE_REDIS_CA_CERT")
     redis_url = os.getenv("TUF_REDIS_URL", os.getenv("REDIS_URL"))
     upstash_redis_rest_url = os.getenv("UPSTASH_REDIS_REST_URL")
     upstash_redis_rest_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
